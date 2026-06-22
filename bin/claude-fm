@@ -165,21 +165,27 @@ stop() {
   if [[ -f "$CLAUDE_FM_PIDFILE" ]]; then
     while IFS= read -r pid; do
       [[ -n "$pid" ]] || continue
-      kill "$pid" 2>/dev/null && killed=$((killed + 1)) || true
+      if kill "$pid" 2>/dev/null; then
+        killed=$((killed + 1))
+      fi
     done <"$CLAUDE_FM_PIDFILE"
     rm -f "$CLAUDE_FM_PIDFILE"
   fi
 
   while IFS= read -r pid; do
     [[ -n "$pid" ]] || continue
-    kill "$pid" 2>/dev/null && killed=$((killed + 1)) || true
+    if kill "$pid" 2>/dev/null; then
+      killed=$((killed + 1))
+    fi
   done < <(pgrep -f 'mpv --vo=tct.*youtube\.com/watch' 2>/dev/null || true)
 
   sleep 0.5
 
   while IFS= read -r pid; do
     [[ -n "$pid" ]] || continue
-    kill -9 "$pid" 2>/dev/null && killed=$((killed + 1)) || true
+    if kill -9 "$pid" 2>/dev/null; then
+      killed=$((killed + 1))
+    fi
   done < <(pgrep -f 'mpv --vo=tct.*youtube\.com/watch' 2>/dev/null || true)
 
   restore_terminal 2>/dev/null || true
