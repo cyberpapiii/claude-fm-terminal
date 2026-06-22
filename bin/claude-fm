@@ -1,0 +1,281 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+VERSION="0.1.0"
+DEFAULT_STREAM="https://www.youtube.com/@anthropic/live"
+YTDLP_FORMAT='bestvideo[height<=480]+bestaudio/best[height<=480]'
+
+usage() {
+  cat <<'EOF'
+claude-fm — play Claude FM (or any YouTube stream) in your terminal
+
+Usage:
+  claude-fm                 Play Claude FM with auto-detected terminal video
+  claude-fm <url>           Play a YouTube livestream or video
+  claude-fm --ascii         Force ASCII-style output
+  claude-fm --color         Force color unicode block art
+  claude-fm --audio         Audio only (no video)
+  claude-fm doctor          Check playback dependencies
+  claude-fm setup           Print recommended dependency install command
+  claude-fm --help          Show this help
+  claude-fm --version       Show version
+
+Controls (mpv):
+  q          quit
+  space      pause / resume
+  m          mute
+  9 / 0      volume down / up
+  f          toggle fullscreen (windowed terminals)
+
+Install:
+  curl -fsSL https://raw.githubusercontent.com/robdezendorf/claude-fm-terminal/main/install.sh | sh
+EOF
+}
+
+have() {
+  command -v "$1" >/dev/null 2>&1
+}
+
+setup_command() {
+  case "$(uname -s)" in
+    Darwin)
+      if have brew; then
+        echo "brew install yt-dlp mpv"
+      else
+        echo "# Install Homebrew first: https://brew.sh"
+        echo "brew install yt-dlp mpv"
+      fi
+      ;;
+    Linux)
+      if have apt-get; then
+        echo "sudo apt-get update && sudo apt-get install -y yt-dlp mpv"
+      elif have dnf; then
+        echo "sudo dnf install -y yt-dlp mpv"
+      elif have pacman; then
+        echo "sudo pacman -S --needed yt-dlp mpv"
+      else
+        echo "# Install yt-dlp and mpv with your package manager"
+      fi
+      ;;
+    MINGW*|MSYS*|CYGWIN*)
+      if have winget; then
+        echo "winget install yt-dlp.yt-dlp mpv.net"
+      else
+        echo "# Install yt-dlp and mpv manually on Windows"
+      fi
+      ;;
+    *)
+      echo "# Install yt-dlp and mpv for your platform"
+      ;;
+  esac
+}
+
+doctor() {
+  local ok=1
+  echo "claude-fm doctor"
+  echo
+
+  if have yt-dlp; then
+    echo "  yt-dlp  ok  ($(command -v yt-dlp))"
+  else
+    echo "  yt-dlp  missing"
+    ok=0
+  fi
+
+  if have mpv; then
+    echo "  mpv     ok  ($(command -v mpv))"
+  else
+    echo "  mpv     missing"
+    ok=0
+  fi
+
+  echo
+  if [[ "$ok" -eq 1 ]]; then
+    echo "Ready. Run: claude-fm"
+    return 0
+  fi
+
+  echo "Install dependencies:"
+  setup_command
+  return 1
+}
+
+pick_vo() {
+  local mode="$1"
+
+  case "$mode" in
+    ascii)
+      echo "tct"
+      ;;
+    color)
+      echo "tct"
+      ;;
+    audio)
+      echo "null"
+      ;;
+    auto)
+      case "${TERM_PROGRAM:-}" in
+        kitty|WezTerm)
+          if mpv --vo=help 2>/dev/null | grep -q '^  kitty '; then
+            echo "kitty"
+            return
+          fi
+          ;;
+      esac
+      echo "tct"
+      ;;
+    *)
+      echo "tct"
+      ;;
+  esac
+}
+
+mpv_extra_args() {
+  local mode="$1"
+  local -a args=()
+
+  args+=(--ytdl-format="$YTDLP_FORMAT")
+  args+=(--profile=sw-fast)
+  args+=(--force-window=no)
+  args+=(--input-default-bindings=yes)
+  args+=(--input-vo-keyboard=no)
+
+  case "$mode" in
+    ascii)
+      args+=(--vo-tct-algo=plain)
+      args+=(--vo-tct-width="${COLUMNS:-80}")
+      args+=(--vo-tct-height="$(( ${LINES:-25} - 2 ))")
+      ;;
+    color|auto)
+      if [[ "$mode" == "color" ]] || [[ "${TERM_PROGRAM:-}" != "kitty" && "${TERM_PROGRAM:-}" != "WezTerm" ]]; then
+        args+=(--vo-tct-algo=half-blocks)
+        args+=(--vo-tct-width="${COLUMNS:-80}")
+        args+=(--vo-tct-height="$(( ${LINES:-25} - 2 ))")
+      fi
+      ;;
+    audio)
+      args+=(--no-video)
+      ;;
+  esac
+
+  printf '%s\0' "${args[@]}"
+}
+
+print_banner() {
+  local mode="$1"
+  local label="auto"
+
+  case "$mode" in
+    ascii) label="ascii" ;;
+    color) label="color" ;;
+    audio) label="audio only" ;;
+    auto)
+      case "${TERM_PROGRAM:-}" in
+        kitty|WezTerm) label="color (kitty)" ;;
+        *) label="color" ;;
+      esac
+      ;;
+  esac
+
+  echo "▶ Claude FM  ·  ${label}  ·  q quit  m mute  space pause  9/0 volume"
+  echo
+}
+
+play() {
+  local mode="auto"
+  local url="$DEFAULT_STREAM"
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --ascii)
+        mode="ascii"
+        shift
+        ;;
+      --color)
+        mode="color"
+        shift
+        ;;
+      --audio)
+        mode="audio"
+        shift
+        ;;
+      --help|-h)
+        usage
+        exit 0
+        ;;
+      --version|-V)
+        echo "claude-fm ${VERSION}"
+        exit 0
+        ;;
+      --)
+        shift
+        break
+        ;;
+      -*)
+        echo "claude-fm: unknown option: $1" >&2
+        usage >&2
+        exit 1
+        ;;
+      *)
+        url="$1"
+        shift
+        ;;
+    esac
+  done
+
+  if [[ $# -gt 0 ]]; then
+    url="$1"
+  fi
+
+  if ! doctor >/dev/null 2>&1; then
+    doctor
+    exit 1
+  fi
+
+  local vo
+  vo="$(pick_vo "$mode")"
+
+  print_banner "$mode"
+
+  local -a mpv_args=()
+  while IFS= read -r -d '' arg; do
+    mpv_args+=("$arg")
+  done < <(mpv_extra_args "$mode")
+
+  if [[ "$mode" == "audio" ]]; then
+    exec mpv "${mpv_args[@]}" "$url"
+  fi
+
+  exec mpv --vo="$vo" "${mpv_args[@]}" "$url"
+}
+
+main() {
+  if [[ $# -eq 0 ]]; then
+    play
+    return
+  fi
+
+  case "$1" in
+    play)
+      shift
+      play "$@"
+      ;;
+    doctor)
+      doctor
+      ;;
+    setup)
+      setup_command
+      ;;
+    --help|-h|help)
+      usage
+      ;;
+    --version|-V)
+      echo "claude-fm ${VERSION}"
+      ;;
+    *)
+      play "$@"
+      ;;
+  esac
+}
+
+main "$@"
