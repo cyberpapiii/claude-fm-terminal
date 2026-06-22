@@ -29,12 +29,13 @@ frame="$tmp/frame.jpg"
 ffmpeg -hide_banner -loglevel error -f lavfi -i testsrc=size=80x45:rate=1 -frames:v 1 -y "$frame"
 
 rendered="$(
+  # shellcheck source=/dev/null
   source "$BIN"
   render_frame "$frame" ascii
 )"
 
 case "$rendered" in
-  *[A-Za-z0-9_\#\$\@\%]*)
+  *[A-Za-z0-9_\#\$\@%]*)
     ;;
   *)
     fail "ascii renderer produced no visible ASCII"
