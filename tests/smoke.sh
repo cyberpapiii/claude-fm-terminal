@@ -12,15 +12,31 @@ fail() {
 bash -n "$BIN" || fail "syntax check bin/claude-fm"
 bash -n "$ROOT/install.sh" || fail "syntax check install.sh"
 
-"$BIN" --version | grep -q 'claude-fm 0.1.8' || fail "--version"
+"$BIN" --version | grep -q 'claude-fm 0.1.10' || fail "--version"
 "$BIN" --help | grep -q 'claude-fm stop' || fail "--help lists stop"
 "$BIN" setup | grep -q 'yt-dlp' || fail "setup"
+
+/bin/bash -c '
+  set -euo pipefail
+  INPUT_CONF=""
+  eval "$(awk "/^write_input_conf\\(\\)/,/^}/" "'"$BIN"'")"
+  eval "$(awk "/^clear_input_conf\\(\\)/,/^}/" "'"$BIN"'")"
+  write_input_conf
+  first="$INPUT_CONF"
+  test -f "$first"
+  write_input_conf
+  second="$INPUT_CONF"
+  test -f "$second"
+  test "$first" != "$second"
+  clear_input_conf
+  rm -f "$first" "$second"
+' || fail "input conf temp file creation"
 
 # bash 3.2 regression: build_mpv_args must not abort under set -e
 /bin/bash -c '
   set -euo pipefail
   YTDLP_FORMAT="test"
-  INPUT_CONF="$(mktemp /tmp/claude-fm-test-input.XXXXXX.conf)"
+  INPUT_CONF="$(mktemp -t claude-fm-test-input.XXXXXX)"
   echo "q quit" >"$INPUT_CONF"
   eval "$(awk "/^tct_geometry\\(\\)/,/^}/" "'"$BIN"'")"
   eval "$(awk "/^build_mpv_args\\(\\)/,/^}/" "'"$BIN"'")"
@@ -30,7 +46,7 @@ bash -n "$ROOT/install.sh" || fail "syntax check install.sh"
 ' || fail "bash 3.2 mpv args build"
 
 if command -v mpv >/dev/null; then
-  conf="$(mktemp /tmp/claude-fm-mpv-test.XXXXXX.conf)"
+  conf="$(mktemp -t claude-fm-mpv-test.XXXXXX)"
   echo "q quit" >"$conf"
   mpv --input-conf="$conf" --input-default-bindings=no --no-video --idle=yes --really-quiet &
   mpv_pid=$!

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="0.1.8"
+VERSION="0.1.10"
 INPUT_CONF=""
 DEFAULT_STREAM="https://www.youtube.com/watch?v=tRsQsTMvPNg"
 YTDLP_FORMAT='bestvideo[height<=360][fps<=30]+bestaudio/best[height<=360]'
@@ -81,7 +81,7 @@ tct_geometry() {
 }
 
 write_input_conf() {
-  INPUT_CONF="$(mktemp "${TMPDIR:-/tmp}/claude-fm-input.XXXXXX.conf")"
+  INPUT_CONF="$(mktemp -t claude-fm-input.XXXXXX)"
   cat >"$INPUT_CONF" <<'EOF'
 q quit
 ESC quit
@@ -192,7 +192,7 @@ stop() {
     if kill "$pid" 2>/dev/null; then
       killed=$((killed + 1))
     fi
-  done < <(pgrep -f 'mpv --vo=tct.*youtube\.com/watch' 2>/dev/null || true)
+  done < <(pgrep -f 'mpv .*youtube\.com/watch' 2>/dev/null || true)
 
   sleep 0.5
 
@@ -201,7 +201,7 @@ stop() {
     if kill -9 "$pid" 2>/dev/null; then
       killed=$((killed + 1))
     fi
-  done < <(pgrep -f 'mpv --vo=tct.*youtube\.com/watch' 2>/dev/null || true)
+  done < <(pgrep -f 'mpv .*youtube\.com/watch' 2>/dev/null || true)
 
   restore_terminal 2>/dev/null || true
 
