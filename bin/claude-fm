@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="0.1.4"
+VERSION="0.1.5"
 DEFAULT_STREAM="https://www.youtube.com/watch?v=tRsQsTMvPNg"
 # Low resolution keeps terminal rendering smooth on live HLS segments.
 YTDLP_FORMAT='bestvideo[height<=360][fps<=30]+bestaudio/best[height<=360]'
@@ -108,7 +108,12 @@ pick_vo() {
 
 tct_geometry() {
   # Trailing newline required: bash 3.2 read returns 1 without it, and set -e aborts.
-  printf '%s %s\n' "${COLUMNS:-80}" "${LINES:-24}"
+  # Reserve one line for the terminal chrome (tab bar / status line).
+  local rows=$(( ${LINES:-24} - 1 ))
+  if [[ "$rows" -lt 10 ]]; then
+    rows=10
+  fi
+  printf '%s %s\n' "${COLUMNS:-80}" "$rows"
 }
 
 mpv_extra_args() {
@@ -129,7 +134,14 @@ mpv_extra_args() {
   fi
 
   args+=(--force-window=no)
-  args+=(--input-default-bindings=yes)
+  # Default bindings enable terminal mouse tracking, which leaks ^[[MC... garbage with tct.
+  args+=(--input-default-bindings=no)
+  args+=(--input-bindings='q quit')
+  args+=(--input-bindings='ESC quit')
+  args+=(--input-bindings='SPACE cycle pause')
+  args+=(--input-bindings='m cycle mute')
+  args+=(--input-bindings='9 add volume -2')
+  args+=(--input-bindings='0 add volume 2')
   args+=(--input-vo-keyboard=no)
   args+=(--input-cursor=no)
 
@@ -169,7 +181,9 @@ mpv_extra_args() {
 }
 
 prepare_terminal() {
-  # Alternate screen: all video + escape noise stays off your shell scrollback.
+  # Disable mouse reporting before alternate screen (prevents ^[[MC... leak below video).
+  printf '\033[?1000l\033[?1002l\033[?1003l\033[?1006l\033[?1015l'
+  # Alternate screen: video + noise stay off your shell scrollback.
   printf '\033[?1049h\033[?25l\033[2J\033[H'
 }
 
@@ -251,10 +265,6 @@ play() {
 
   local vo
   vo="$(pick_vo)"
-
-  if [[ "$mode" == "audio" ]]; then
-    print_banner "$mode"
-  fi
 
   local -a mpv_args=()
   while IFS= read -r -d '' arg; do
