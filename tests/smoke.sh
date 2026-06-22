@@ -12,7 +12,7 @@ fail() {
 bash -n "$BIN" || fail "syntax check bin/claude-fm"
 bash -n "$ROOT/install.sh" || fail "syntax check install.sh"
 
-"$BIN" --version | grep -q 'claude-fm 0.1.0' || fail "--version"
+"$BIN" --version | grep -q 'claude-fm 0.1.3' || fail "--version"
 "$BIN" --help | grep -q 'claude-fm --ascii' || fail "--help"
 "$BIN" setup | grep -q 'yt-dlp' || fail "setup"
 

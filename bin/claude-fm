@@ -1,20 +1,22 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="0.1.0"
-DEFAULT_STREAM="https://www.youtube.com/@anthropic/live"
-YTDLP_FORMAT='bestvideo[height<=480]+bestaudio/best[height<=480]'
+VERSION="0.1.3"
+DEFAULT_STREAM="https://www.youtube.com/watch?v=tRsQsTMvPNg"
+# Low resolution keeps terminal rendering smooth on live HLS segments.
+YTDLP_FORMAT='bestvideo[height<=360][fps<=30]+bestaudio/best[height<=360]'
 
 usage() {
   cat <<'EOF'
 claude-fm — play Claude FM (or any YouTube stream) in your terminal
 
 Usage:
-  claude-fm                 Play Claude FM with auto-detected terminal video
+  claude-fm                 Play Claude FM in ASCII mode (default)
   claude-fm <url>           Play a YouTube livestream or video
-  claude-fm --ascii         Force ASCII-style output
-  claude-fm --color         Force color unicode block art
+  claude-fm --color         Color unicode block art
+  claude-fm --ascii         ASCII mode (default)
   claude-fm --audio         Audio only (no video)
+  claude-fm --stable        Extra-stable video (lower res, fewer artifacts)
   claude-fm doctor          Check playback dependencies
   claude-fm setup           Print recommended dependency install command
   claude-fm --help          Show this help
@@ -101,57 +103,61 @@ doctor() {
 }
 
 pick_vo() {
-  local mode="$1"
+  echo "tct"
+}
 
-  case "$mode" in
-    ascii)
-      echo "tct"
-      ;;
-    color)
-      echo "tct"
-      ;;
-    audio)
-      echo "null"
-      ;;
-    auto)
-      case "${TERM_PROGRAM:-}" in
-        kitty|WezTerm)
-          if mpv --vo=help 2>/dev/null | grep -q '^  kitty '; then
-            echo "kitty"
-            return
-          fi
-          ;;
-      esac
-      echo "tct"
-      ;;
-    *)
-      echo "tct"
-      ;;
-  esac
+tct_geometry() {
+  printf '%s %s' "${COLUMNS:-80}" "${LINES:-24}"
 }
 
 mpv_extra_args() {
   local mode="$1"
+  local stable="$2"
   local -a args=()
+  local width height
+  read -r width height < <(tct_geometry)
 
-  args+=(--ytdl-format="$YTDLP_FORMAT")
-  args+=(--profile=sw-fast)
+  if [[ "$stable" == "1" && "$mode" != "audio" ]]; then
+    args+=(--ytdl-format='worstvideo[height<=240]+worstaudio/worst')
+    args+=(--framedrop=vo)
+  else
+    args+=(--ytdl-format="$YTDLP_FORMAT")
+    if [[ "$mode" != "audio" ]]; then
+      args+=(--profile=sw-fast)
+    fi
+  fi
+
   args+=(--force-window=no)
   args+=(--input-default-bindings=yes)
   args+=(--input-vo-keyboard=no)
+  args+=(--input-cursor=no)
+
+  # tct output breaks when mpv prints status/logs over the frame.
+  args+=(--really-quiet)
+  args+=(--no-terminal)
+  args+=(--terminal=no)
+  args+=(--osd-level=0)
+  args+=(--msg-level=all=no)
+  args+=(--idle=no)
+
+  # Live HLS: avoid cache pauses that desync terminal frames.
+  if [[ "$mode" != "audio" ]]; then
+    args+=(--cache=no)
+    args+=(--demuxer-readahead-secs=0)
+  fi
 
   case "$mode" in
     ascii)
       args+=(--vo-tct-algo=plain)
-      args+=(--vo-tct-width="${COLUMNS:-80}")
-      args+=(--vo-tct-height="$(( ${LINES:-25} - 2 ))")
+      args+=(--vo-tct-buffering=frame)
+      args+=(--vo-tct-width="$width")
+      args+=(--vo-tct-height="$height")
       ;;
-    color|auto)
-      if [[ "$mode" == "color" ]] || [[ "${TERM_PROGRAM:-}" != "kitty" && "${TERM_PROGRAM:-}" != "WezTerm" ]]; then
-        args+=(--vo-tct-algo=half-blocks)
-        args+=(--vo-tct-width="${COLUMNS:-80}")
-        args+=(--vo-tct-height="$(( ${LINES:-25} - 2 ))")
-      fi
+    color)
+      args+=(--vo-tct-algo=half-blocks)
+      args+=(--vo-tct-buffering=frame)
+      args+=(--vo-tct-width="$width")
+      args+=(--vo-tct-height="$height")
       ;;
     audio)
       args+=(--no-video)
@@ -161,29 +167,35 @@ mpv_extra_args() {
   printf '%s\0' "${args[@]}"
 }
 
+prepare_terminal() {
+  # Alternate screen: all video + escape noise stays off your shell scrollback.
+  printf '\033[?1049h\033[?25l\033[2J\033[H'
+}
+
+restore_terminal() {
+  # Turn off mouse reporting modes terminals/mpv may leave enabled.
+  printf '\033[?1000l\033[?1002l\033[?1003l\033[?1006l\033[?1015l'
+  printf '\033[?25h\033[0m'
+  printf '\033[?1049l'
+  stty sane 2>/dev/null || true
+}
+
 print_banner() {
   local mode="$1"
-  local label="auto"
+  local label="ascii"
 
   case "$mode" in
-    ascii) label="ascii" ;;
     color) label="color" ;;
     audio) label="audio only" ;;
-    auto)
-      case "${TERM_PROGRAM:-}" in
-        kitty|WezTerm) label="color (kitty)" ;;
-        *) label="color" ;;
-      esac
-      ;;
   esac
 
-  echo "▶ Claude FM  ·  ${label}  ·  q quit  m mute  space pause  9/0 volume"
-  echo
+  echo "▶ Claude FM  ·  ${label}  ·  q quit  m mute  space pause  9/0 volume" >&2
 }
 
 play() {
-  local mode="auto"
-  local url="$DEFAULT_STREAM"
+  local mode="ascii"
+  local stable=0
+  local url="${CLAUDE_FM_URL:-$DEFAULT_STREAM}"
 
   while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -197,6 +209,10 @@ play() {
         ;;
       --audio)
         mode="audio"
+        shift
+        ;;
+      --stable)
+        stable=1
         shift
         ;;
       --help|-h)
@@ -233,20 +249,30 @@ play() {
   fi
 
   local vo
-  vo="$(pick_vo "$mode")"
+  vo="$(pick_vo)"
 
-  print_banner "$mode"
+  if [[ "$mode" == "audio" ]]; then
+    print_banner "$mode"
+  fi
 
   local -a mpv_args=()
   while IFS= read -r -d '' arg; do
     mpv_args+=("$arg")
-  done < <(mpv_extra_args "$mode")
+  done < <(mpv_extra_args "$mode" "$stable")
 
   if [[ "$mode" == "audio" ]]; then
-    exec mpv "${mpv_args[@]}" "$url"
+    mpv "${mpv_args[@]}" "$url"
+    return $?
   fi
 
-  exec mpv --vo="$vo" "${mpv_args[@]}" "$url"
+  prepare_terminal
+  trap restore_terminal EXIT INT TERM HUP
+
+  mpv --vo="$vo" "${mpv_args[@]}" "$url"
+  local status=$?
+  restore_terminal
+  trap - EXIT INT TERM HUP
+  return "$status"
 }
 
 main() {

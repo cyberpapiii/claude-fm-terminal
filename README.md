@@ -26,11 +26,12 @@ Requires **yt-dlp** and **mpv**. The installer tries to install them for you.
 claude-fm
 ```
 
-That's it. Auto-detects your terminal and picks the best renderer.
+That's it. ASCII art by default.
 
 ```bash
-claude-fm --ascii          # classic ASCII look
-claude-fm --color          # color unicode blocks (default on most terminals)
+claude-fm --color          # color unicode blocks
+claude-fm --ascii          # ASCII (default)
+claude-fm --stable         # fewer glitches (lower res, drops frames if needed)
 claude-fm --audio          # audio only
 claude-fm "https://youtube.com/watch?v=..."   # any YouTube URL
 ```
@@ -55,7 +56,29 @@ claude-fm "https://youtube.com/watch?v=..."   # any YouTube URL
 
 ## How it works
 
-`claude-fm` is a tiny bash wrapper around [yt-dlp](https://github.com/yt-dlp/yt-dlp) and [mpv](https://mpv.io/). It resolves the current Claude FM livestream via `@anthropic/live`, caps quality for terminal performance, and renders with mpv's terminal video outputs (`tct`, `kitty`).
+`claude-fm` is a tiny bash wrapper around [yt-dlp](https://github.com/yt-dlp/yt-dlp) and [mpv](https://mpv.io/). It plays the Claude FM livestream by default, caps quality for terminal performance, and renders with mpv's terminal video outputs (`tct`, `kitty`).
+
+## Tips for smoother playback
+
+Terminal video is inherently a bit janky. These defaults help:
+
+- mpv runs in `--really-quiet` mode so status text doesn't corrupt frames
+- Livestream cache is disabled to avoid HLS desync
+- Frames are buffered atomically (`--vo-tct-buffering=frame`)
+
+If you still see glitches, try:
+
+```bash
+claude-fm --stable    # lowest res, drops frames to stay smooth
+claude-fm --audio     # best for background music while you work
+```
+
+When Anthropic rotates the stream URL:
+
+```bash
+export CLAUDE_FM_URL="https://www.youtube.com/watch?v=..."
+claude-fm
+```
 
 ## Platforms
 
