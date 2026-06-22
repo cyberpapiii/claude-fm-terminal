@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="0.1.5"
+VERSION="0.1.6"
 DEFAULT_STREAM="https://www.youtube.com/watch?v=tRsQsTMvPNg"
 # Low resolution keeps terminal rendering smooth on live HLS segments.
 YTDLP_FORMAT='bestvideo[height<=360][fps<=30]+bestaudio/best[height<=360]'
@@ -18,6 +18,7 @@ Usage:
   claude-fm --audio         Audio only (no video)
   claude-fm --stable        Extra-stable video (lower res, fewer artifacts)
   claude-fm doctor          Check playback dependencies
+  claude-fm stop            Kill any claude-fm / mpv sessions
   claude-fm setup           Print recommended dependency install command
   claude-fm --help          Show this help
   claude-fm --version       Show version
@@ -70,6 +71,31 @@ setup_command() {
       echo "# Install yt-dlp and mpv for your platform"
       ;;
   esac
+}
+
+stop() {
+  local killed=0
+  local pid
+
+  while IFS= read -r pid; do
+    [[ -n "$pid" ]] || continue
+    kill "$pid" 2>/dev/null && killed=$((killed + 1)) || true
+  done < <(pgrep -f 'claude-fm|mpv.*youtube|mpv.*tRsQsTMvPNg' 2>/dev/null || true)
+
+  sleep 0.5
+
+  while IFS= read -r pid; do
+    [[ -n "$pid" ]] || continue
+    kill -9 "$pid" 2>/dev/null && killed=$((killed + 1)) || true
+  done < <(pgrep -f 'claude-fm|mpv.*youtube|mpv.*tRsQsTMvPNg' 2>/dev/null || true)
+
+  restore_terminal 2>/dev/null || true
+
+  if [[ "$killed" -gt 0 ]]; then
+    echo "Stopped claude-fm playback."
+  else
+    echo "No claude-fm sessions running."
+  fi
 }
 
 doctor() {
@@ -308,6 +334,9 @@ main() {
       ;;
     doctor)
       doctor
+      ;;
+    stop)
+      stop
       ;;
     setup)
       setup_command
