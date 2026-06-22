@@ -12,59 +12,34 @@ fail() {
 bash -n "$BIN" || fail "syntax check bin/claude-fm"
 bash -n "$ROOT/install.sh" || fail "syntax check install.sh"
 
-"$BIN" --version | grep -q 'claude-fm 0.1.10' || fail "--version"
-"$BIN" --help | grep -q 'claude-fm stop' || fail "--help lists stop"
-"$BIN" setup | grep -q 'yt-dlp' || fail "setup"
+"$BIN" --version | grep -q 'claude-fm 0.2.0' || fail "--version"
+"$BIN" --help | grep -q 'centered ASCII art' || fail "--help"
+"$BIN" setup | grep -q 'chafa' || fail "setup includes chafa"
 
-/bin/bash -c '
-  set -euo pipefail
-  INPUT_CONF=""
-  eval "$(awk "/^write_input_conf\\(\\)/,/^}/" "'"$BIN"'")"
-  eval "$(awk "/^clear_input_conf\\(\\)/,/^}/" "'"$BIN"'")"
-  write_input_conf
-  first="$INPUT_CONF"
-  test -f "$first"
-  write_input_conf
-  second="$INPUT_CONF"
-  test -f "$second"
-  test "$first" != "$second"
-  clear_input_conf
-  rm -f "$first" "$second"
-' || fail "input conf temp file creation"
-
-# bash 3.2 regression: build_mpv_args must not abort under set -e
-/bin/bash -c '
-  set -euo pipefail
-  YTDLP_FORMAT="test"
-  INPUT_CONF="$(mktemp -t claude-fm-test-input.XXXXXX)"
-  echo "q quit" >"$INPUT_CONF"
-  eval "$(awk "/^tct_geometry\\(\\)/,/^}/" "'"$BIN"'")"
-  eval "$(awk "/^build_mpv_args\\(\\)/,/^}/" "'"$BIN"'")"
-  build_mpv_args audio 0
-  test ${#MPV_ARGS[@]} -gt 0
-  rm -f "$INPUT_CONF"
-' || fail "bash 3.2 mpv args build"
-
-if command -v mpv >/dev/null; then
-  conf="$(mktemp -t claude-fm-mpv-test.XXXXXX)"
-  echo "q quit" >"$conf"
-  mpv --input-conf="$conf" --input-default-bindings=no --no-video --idle=yes --really-quiet &
-  mpv_pid=$!
-  sleep 1
-  if kill -0 "$mpv_pid" 2>/dev/null; then
-    kill "$mpv_pid" 2>/dev/null || true
-  else
-    rm -f "$conf"
-    fail "mpv rejected input.conf"
-  fi
-  rm -f "$conf"
-fi
-
-if command -v yt-dlp >/dev/null && command -v mpv >/dev/null; then
+if command -v yt-dlp >/dev/null && command -v mpv >/dev/null && command -v ffmpeg >/dev/null && command -v chafa >/dev/null; then
   "$BIN" doctor | grep -q 'Ready' || fail "doctor when deps present"
 else
-  echo "SKIP: doctor with deps (yt-dlp/mpv not installed)"
+  echo "SKIP: doctor with deps (yt-dlp/mpv/ffmpeg/chafa not installed)"
 fi
+
+tmp="$(mktemp -d -t claude-fm-smoke.XXXXXX)"
+trap 'rm -rf "$tmp"' EXIT
+
+frame="$tmp/frame.jpg"
+ffmpeg -hide_banner -loglevel error -f lavfi -i testsrc=size=80x45:rate=1 -frames:v 1 -y "$frame"
+
+rendered="$(
+  source "$BIN"
+  render_frame "$frame" ascii
+)"
+
+case "$rendered" in
+  *[A-Za-z0-9_\#\$\@\%]*)
+    ;;
+  *)
+    fail "ascii renderer produced no visible ASCII"
+    ;;
+esac
 
 "$BIN" stop | grep -q 'No claude-fm sessions' || fail "stop when idle"
 

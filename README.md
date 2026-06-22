@@ -18,7 +18,7 @@ cd claude-fm-terminal
 ./install.sh
 ```
 
-Requires **yt-dlp** and **mpv**. The installer tries to install them for you.
+Requires **yt-dlp**, **mpv**, **ffmpeg**, and **chafa**. The installer tries to install them for you.
 
 ## Run
 
@@ -35,8 +35,8 @@ claude-fm --audio
 Other modes:
 
 ```bash
-claude-fm --color          # color unicode blocks
-claude-fm --stable         # fewer glitches (lower res)
+claude-fm --color          # colored character art
+claude-fm --stable         # lower FPS
 claude-fm "https://youtube.com/watch?v=..."   # any YouTube URL
 ```
 
@@ -51,9 +51,7 @@ claude-fm stop
 | Key | Action |
 | --- | --- |
 | `q` | Quit |
-| `space` | Pause / resume |
-| `m` | Mute |
-| `9` / `0` | Volume down / up |
+| `ESC` | Quit |
 
 ## Commands
 
@@ -62,13 +60,18 @@ claude-fm stop
 | `claude-fm` | Play Claude FM (ASCII) |
 | `claude-fm --audio` | Audio only (recommended for daily use) |
 | `claude-fm stop` | Kill stuck playback sessions |
-| `claude-fm doctor` | Check yt-dlp + mpv |
+| `claude-fm doctor` | Check dependencies |
 | `claude-fm setup` | Print dependency install command |
 | `claude-fm --help` | Show help |
 
 ## How it works
 
-`claude-fm` is a tiny bash wrapper around [yt-dlp](https://github.com/yt-dlp/yt-dlp) and [mpv](https://mpv.io/). It plays the Claude FM livestream by default, caps quality for terminal performance, and renders with mpv's `tct` terminal output.
+`claude-fm` is a tiny bash wrapper around [yt-dlp](https://github.com/yt-dlp/yt-dlp), [ffmpeg](https://ffmpeg.org/), [chafa](https://github.com/hpjansson/chafa), and [mpv](https://mpv.io/).
+
+- `yt-dlp` resolves the current YouTube media stream.
+- `ffmpeg` extracts low-FPS frames.
+- `chafa` renders centered ASCII characters in the terminal.
+- `mpv` plays the audio in the background.
 
 When Anthropic rotates the stream URL:
 
@@ -79,7 +82,7 @@ claude-fm
 
 ## Tips
 
-Terminal video is fun but a bit janky. If you see glitches, try `claude-fm --stable` or `claude-fm --audio`.
+Terminal video is fun but still a little experimental. If you want the reliable daily-driver experience, use `claude-fm --audio`.
 
 ## Platforms
 
@@ -92,12 +95,15 @@ Terminal video is fun but a bit janky. If you see glitches, try `claude-fm --sta
 ```bash
 # macOS
 brew install yt-dlp mpv
+brew install ffmpeg chafa
 
 # Debian / Ubuntu
 sudo apt-get install yt-dlp mpv
+sudo apt-get install ffmpeg chafa
 
 # Fedora
 sudo dnf install yt-dlp mpv
+sudo dnf install ffmpeg chafa
 ```
 
 ## License

@@ -27,7 +27,7 @@ install_deps() {
   case "$(uname -s)" in
     Darwin)
       if have brew; then
-        brew install yt-dlp mpv
+        brew install yt-dlp mpv ffmpeg chafa
       else
         echo "Install Homebrew from https://brew.sh then re-run this installer." >&2
         exit 1
@@ -36,24 +36,24 @@ install_deps() {
     Linux)
       if have apt-get; then
         sudo apt-get update
-        sudo apt-get install -y yt-dlp mpv
+        sudo apt-get install -y yt-dlp mpv ffmpeg chafa
       elif have dnf; then
-        sudo dnf install -y yt-dlp mpv
+        sudo dnf install -y yt-dlp mpv ffmpeg chafa
       elif have pacman; then
-        sudo pacman -S --needed yt-dlp mpv
+        sudo pacman -S --needed yt-dlp mpv ffmpeg chafa
       else
-        echo "Install yt-dlp and mpv with your package manager, then run: claude-fm doctor" >&2
+        echo "Install yt-dlp, mpv, ffmpeg, and chafa with your package manager, then run: claude-fm doctor" >&2
       fi
       ;;
     MINGW*|MSYS*|CYGWIN*)
       if have winget; then
         winget install yt-dlp.yt-dlp mpv.net
       else
-        echo "Install yt-dlp and mpv manually, then run: claude-fm doctor" >&2
+        echo "Install yt-dlp, mpv, ffmpeg, and chafa manually, then run: claude-fm doctor" >&2
       fi
       ;;
     *)
-      echo "Unsupported OS. Install yt-dlp and mpv manually." >&2
+      echo "Unsupported OS. Install yt-dlp, mpv, ffmpeg, and chafa manually." >&2
       ;;
   esac
 }
@@ -87,7 +87,7 @@ main() {
 
   chmod +x "$INSTALL_DIR/claude-fm"
 
-  if ! have yt-dlp || ! have mpv; then
+  if ! have yt-dlp || ! have mpv || ! have ffmpeg || ! have chafa; then
     echo "Installing playback dependencies..."
     install_deps || true
   fi
