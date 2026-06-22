@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="0.1.3"
+VERSION="0.1.4"
 DEFAULT_STREAM="https://www.youtube.com/watch?v=tRsQsTMvPNg"
 # Low resolution keeps terminal rendering smooth on live HLS segments.
 YTDLP_FORMAT='bestvideo[height<=360][fps<=30]+bestaudio/best[height<=360]'
@@ -107,7 +107,8 @@ pick_vo() {
 }
 
 tct_geometry() {
-  printf '%s %s' "${COLUMNS:-80}" "${LINES:-24}"
+  # Trailing newline required: bash 3.2 read returns 1 without it, and set -e aborts.
+  printf '%s %s\n' "${COLUMNS:-80}" "${LINES:-24}"
 }
 
 mpv_extra_args() {
@@ -261,17 +262,26 @@ play() {
   done < <(mpv_extra_args "$mode" "$stable")
 
   if [[ "$mode" == "audio" ]]; then
-    mpv "${mpv_args[@]}" "$url"
+    print_banner "$mode"
+    mpv ${mpv_args+"${mpv_args[@]}"} "$url"
     return $?
   fi
+
+  print_banner "$mode"
+  echo "  Loading stream (may take 10–20s)..." >&2
 
   prepare_terminal
   trap restore_terminal EXIT INT TERM HUP
 
-  mpv --vo="$vo" "${mpv_args[@]}" "$url"
+  mpv --vo="$vo" ${mpv_args+"${mpv_args[@]}"} "$url"
   local status=$?
   restore_terminal
   trap - EXIT INT TERM HUP
+
+  if [[ "$status" -ne 0 ]]; then
+    echo "claude-fm: playback failed (exit $status). Try: claude-fm doctor" >&2
+  fi
+
   return "$status"
 }
 
