@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO_URL="${CLAUDE_FM_REPO:-https://github.com/robdezendorf/claude-fm-terminal}"
+REPO_URL="${CLAUDE_FM_REPO:-https://github.com/cyberpapiii/claude-fm-terminal}"
 INSTALL_DIR="${CLAUDE_FM_INSTALL_DIR:-$HOME/.local/bin}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 

@@ -7,13 +7,13 @@ No browser tab. No video page. Just terminal vibes.
 ## Install
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/robdezendorf/claude-fm-terminal/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/cyberpapiii/claude-fm-terminal/main/install.sh | sh
 ```
 
 Or clone and install locally:
 
 ```bash
-git clone https://github.com/robdezendorf/claude-fm-terminal.git
+git clone https://github.com/cyberpapiii/claude-fm-terminal.git
 cd claude-fm-terminal
 ./install.sh
 ```

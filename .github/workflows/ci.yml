@@ -1,0 +1,22 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y bash shellcheck
+
+      - name: Shellcheck
+        run: shellcheck bin/claude-fm install.sh tests/smoke.sh
+
+      - name: Smoke tests
+        run: ./tests/smoke.sh

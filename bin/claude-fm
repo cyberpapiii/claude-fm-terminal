@@ -28,7 +28,7 @@ Controls (mpv):
   f          toggle fullscreen (windowed terminals)
 
 Install:
-  curl -fsSL https://raw.githubusercontent.com/robdezendorf/claude-fm-terminal/main/install.sh | sh
+  curl -fsSL https://raw.githubusercontent.com/cyberpapiii/claude-fm-terminal/main/install.sh | sh
 EOF
 }
 
