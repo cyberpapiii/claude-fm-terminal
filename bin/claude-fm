@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="0.1.7"
+VERSION="0.1.8"
+INPUT_CONF=""
 DEFAULT_STREAM="https://www.youtube.com/watch?v=tRsQsTMvPNg"
 YTDLP_FORMAT='bestvideo[height<=360][fps<=30]+bestaudio/best[height<=360]'
 CLAUDE_FM_PIDFILE="${CLAUDE_FM_PIDFILE:-${TMPDIR:-/tmp}/claude-fm-${UID:-0}.pid}"
@@ -79,6 +80,25 @@ tct_geometry() {
   printf '%s %s\n' "${COLUMNS:-80}" "$rows"
 }
 
+write_input_conf() {
+  INPUT_CONF="$(mktemp "${TMPDIR:-/tmp}/claude-fm-input.XXXXXX.conf")"
+  cat >"$INPUT_CONF" <<'EOF'
+q quit
+ESC quit
+SPACE cycle pause
+m cycle mute
+9 add volume -2
+0 add volume 2
+EOF
+}
+
+clear_input_conf() {
+  if [[ -n "$INPUT_CONF" && -f "$INPUT_CONF" ]]; then
+    rm -f "$INPUT_CONF"
+    INPUT_CONF=""
+  fi
+}
+
 build_mpv_args() {
   local mode="$1"
   local stable="$2"
@@ -98,13 +118,8 @@ build_mpv_args() {
   fi
 
   MPV_ARGS+=(--force-window=no)
+  MPV_ARGS+=(--input-conf="$INPUT_CONF")
   MPV_ARGS+=(--input-default-bindings=no)
-  MPV_ARGS+=(--input-bindings='q quit')
-  MPV_ARGS+=(--input-bindings='ESC quit')
-  MPV_ARGS+=(--input-bindings='SPACE cycle pause')
-  MPV_ARGS+=(--input-bindings='m cycle mute')
-  MPV_ARGS+=(--input-bindings='9 add volume -2')
-  MPV_ARGS+=(--input-bindings='0 add volume 2')
   MPV_ARGS+=(--input-vo-keyboard=no)
   MPV_ARGS+=(--input-cursor=no)
   MPV_ARGS+=(--really-quiet)
@@ -295,12 +310,13 @@ play() {
     exit 1
   fi
 
+  write_input_conf
   build_mpv_args "$mode" "$stable"
   print_banner "$mode"
 
   if [[ "$mode" == "audio" ]]; then
     record_pidfile
-    trap clear_pidfile EXIT INT TERM HUP
+    trap 'clear_pidfile; clear_input_conf' EXIT INT TERM HUP
     mpv ${MPV_ARGS+"${MPV_ARGS[@]}"} "$url"
     return $?
   fi
@@ -308,12 +324,13 @@ play() {
   echo "  Loading stream (may take 10–20s)..." >&2
   record_pidfile
   prepare_terminal
-  trap 'restore_terminal; clear_pidfile' EXIT INT TERM HUP
+  trap 'restore_terminal; clear_pidfile; clear_input_conf' EXIT INT TERM HUP
 
   mpv --vo=tct ${MPV_ARGS+"${MPV_ARGS[@]}"} "$url"
   local status=$?
   restore_terminal
   clear_pidfile
+  clear_input_conf
   trap - EXIT INT TERM HUP
 
   if [[ "$status" -ne 0 ]]; then
