@@ -1,6 +1,6 @@
 # claude-fm
 
-Claude FM in your terminal. Play the official Claude FM YouTube livestream — or any YouTube stream — as color block art or ASCII, with one command.
+Claude FM in your terminal. Play the official Claude FM YouTube livestream — or any YouTube stream — as ASCII art, with one command.
 
 No browser tab. No video page. Just terminal vibes.
 
@@ -26,14 +26,24 @@ Requires **yt-dlp** and **mpv**. The installer tries to install them for you.
 claude-fm
 ```
 
-That's it. ASCII art by default.
+ASCII art by default. For background music while you work:
+
+```bash
+claude-fm --audio
+```
+
+Other modes:
 
 ```bash
 claude-fm --color          # color unicode blocks
-claude-fm --ascii          # ASCII (default)
-claude-fm --stable         # fewer glitches (lower res, drops frames if needed)
-claude-fm --audio          # audio only
+claude-fm --stable         # fewer glitches (lower res)
 claude-fm "https://youtube.com/watch?v=..."   # any YouTube URL
+```
+
+Stuck or running in another tab?
+
+```bash
+claude-fm stop
 ```
 
 ## Controls
@@ -49,29 +59,16 @@ claude-fm "https://youtube.com/watch?v=..."   # any YouTube URL
 
 | Command | What it does |
 | --- | --- |
-| `claude-fm` | Play Claude FM (auto mode) |
+| `claude-fm` | Play Claude FM (ASCII) |
+| `claude-fm --audio` | Audio only (recommended for daily use) |
+| `claude-fm stop` | Kill stuck playback sessions |
 | `claude-fm doctor` | Check yt-dlp + mpv |
 | `claude-fm setup` | Print dependency install command |
 | `claude-fm --help` | Show help |
 
 ## How it works
 
-`claude-fm` is a tiny bash wrapper around [yt-dlp](https://github.com/yt-dlp/yt-dlp) and [mpv](https://mpv.io/). It plays the Claude FM livestream by default, caps quality for terminal performance, and renders with mpv's terminal video outputs (`tct`, `kitty`).
-
-## Tips for smoother playback
-
-Terminal video is inherently a bit janky. These defaults help:
-
-- mpv runs in `--really-quiet` mode so status text doesn't corrupt frames
-- Livestream cache is disabled to avoid HLS desync
-- Frames are buffered atomically (`--vo-tct-buffering=frame`)
-
-If you still see glitches, try:
-
-```bash
-claude-fm --stable    # lowest res, drops frames to stay smooth
-claude-fm --audio     # best for background music while you work
-```
+`claude-fm` is a tiny bash wrapper around [yt-dlp](https://github.com/yt-dlp/yt-dlp) and [mpv](https://mpv.io/). It plays the Claude FM livestream by default, caps quality for terminal performance, and renders with mpv's `tct` terminal output.
 
 When Anthropic rotates the stream URL:
 
@@ -80,9 +77,13 @@ export CLAUDE_FM_URL="https://www.youtube.com/watch?v=..."
 claude-fm
 ```
 
+## Tips
+
+Terminal video is fun but a bit janky. If you see glitches, try `claude-fm --stable` or `claude-fm --audio`.
+
 ## Platforms
 
-- **macOS** — iTerm2, Terminal.app, Ghostty, Kitty, WezTerm
+- **macOS** — iTerm2, Terminal.app, Ghostty, Kitty, WezTerm, Cursor
 - **Linux** — any modern terminal with true color
 - **Windows** — Windows Terminal via Git Bash or WSL
 
